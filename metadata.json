@@ -1,0 +1,6 @@
+{
+  "name": "GlycoLedger",
+  "description": "Personal daily meal intake tracker for glucose and calorie control with nutritional summaries, a searchable food database, and caloric deficit trend analysis.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
