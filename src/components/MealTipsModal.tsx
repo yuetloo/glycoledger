@@ -1,19 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import {
-  ArrowRight,
-  Lightbulb,
-  Loader2,
-  Sparkles,
-  X,
-} from 'lucide-react';
+import React from 'react';
+import { ArrowRight, Lightbulb, X } from 'lucide-react';
 import { FoodItem } from '../types/nutrition';
 import { MealImprovementReport } from '../utils/mealTips';
-
-interface AiTweak {
-  title: string;
-  tweak: string;
-  expectedImpact: string;
-}
 
 interface MealTipsModalProps {
   report: MealImprovementReport | null;
@@ -26,54 +14,7 @@ export const MealTipsModal: React.FC<MealTipsModalProps> = ({
   onClose,
   onApplySwap,
 }) => {
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
-  const [aiTweaks, setAiTweaks] = useState<AiTweak[]>([]);
-
-  useEffect(() => {
-    setAiLoading(false);
-    setAiError(null);
-    setAiTweaks([]);
-  }, [report?.title, report?.itemsSummary]);
-
   if (!report) return null;
-
-  const handleFetchAiTweaks = async () => {
-    setAiLoading(true);
-    setAiError(null);
-    try {
-      const res = await fetch('/api/ai/meal-tips', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mealTitle: report.title,
-          mealType: report.mealType,
-          itemsSummary: report.itemsSummary,
-          totals: {
-            calories: report.calories,
-            netCarbs: report.netCarbs,
-            protein: report.protein,
-            fiber: report.fiber,
-            fat: report.fat,
-            glycemicLoad: report.glycemicLoad,
-          },
-        }),
-      });
-      const data = (await res.json()) as {
-        error?: string;
-        tweaks?: AiTweak[];
-      };
-      if (!res.ok) {
-        setAiError(data.error || 'Unable to generate AI meal tweaks.');
-        return;
-      }
-      setAiTweaks(Array.isArray(data.tweaks) ? data.tweaks : []);
-    } catch {
-      setAiError('Network error reaching AI coaching endpoint.');
-    } finally {
-      setAiLoading(false);
-    }
-  };
 
   return (
     <div
@@ -206,61 +147,6 @@ export const MealTipsModal: React.FC<MealTipsModalProps> = ({
               </div>
             </div>
           )}
-
-          {/* Optional AI Personalized Culinary & Glycemic Tweaks */}
-          <div className="pt-2 border-t border-slate-200 space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h3 className="text-xs font-semibold text-slate-900">
-                  Personalized AI Meal Coaching
-                </h3>
-                <p className="text-[11px] text-slate-500">
-                  Get custom ingredient additions, prep tweaks, or food-order tips for this meal
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleFetchAiTweaks}
-                disabled={aiLoading}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-teal-800 bg-teal-50/70 border border-teal-200 rounded-md hover:bg-teal-100/70 disabled:opacity-50 transition-colors whitespace-nowrap"
-              >
-                {aiLoading ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="w-3.5 h-3.5" />
-                )}
-                {aiLoading
-                  ? 'Generating Tweaks...'
-                  : aiTweaks.length > 0
-                  ? 'Refresh AI Tweaks'
-                  : 'Get AI Tweaks'}
-              </button>
-            </div>
-
-            {aiError && (
-              <div className="p-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded-md">
-                {aiError}
-              </div>
-            )}
-
-            {aiTweaks.length > 0 && (
-              <div className="divide-y divide-slate-100 border border-slate-200 rounded-md">
-                {aiTweaks.map((item, idx) => (
-                  <div key={`${item.title}-${idx}`} className="p-3 space-y-1">
-                    <div className="text-xs font-semibold text-slate-900">
-                      {item.title}
-                    </div>
-                    <p className="text-xs text-slate-600 leading-relaxed">
-                      {item.tweak}
-                    </p>
-                    <div className="text-[11px] font-medium text-emerald-700">
-                      Impact: {item.expectedImpact}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
 
         <div className="px-5 py-3.5 border-t border-slate-200 flex justify-end shrink-0">

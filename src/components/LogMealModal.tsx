@@ -1,13 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  Check,
-  Loader2,
-  Search,
-  Sparkles,
-  Star,
-  Trash2,
-  X,
-} from 'lucide-react';
+import { Search, Star, Trash2, X } from 'lucide-react';
 import {
   FavoriteMeal,
   FoodCategory,
@@ -21,12 +13,7 @@ import {
   MEAL_TYPES,
 } from '../utils/nutritionMath';
 
-export type LogMealMode = 'search' | 'ai' | 'favorites';
-
-interface AiParsedDraftItem {
-  food: FoodItem;
-  servings: number;
-}
+export type LogMealMode = 'search' | 'favorites';
 
 interface LogMealModalProps {
   isOpen: boolean;
@@ -53,14 +40,6 @@ interface LogMealModalProps {
       defaultMealType?: MealType;
     }
   ) => void;
-  onAddFavoriteMeal: (
-    food: FoodItem,
-    options?: {
-      name?: string;
-      defaultServings?: number;
-      defaultMealType?: MealType;
-    }
-  ) => void;
   onRemoveFavorite: (id: string) => void;
 }
 
@@ -70,12 +49,6 @@ const DEFAULT_MEAL_TIMES: Record<MealType, string> = {
   Dinner: '19:00',
   Snack: '15:45',
 };
-
-const AI_EXAMPLE_PROMPTS = [
-  '2 scrambled eggs, 1 slice sourdough toast, and half an avocado',
-  'Grilled chicken breast with 1 cup quinoa and roasted broccoli',
-  'Greek yogurt with blueberries, chia seeds, and black coffee',
-];
 
 export const LogMealModal: React.FC<LogMealModalProps> = ({
   isOpen,
@@ -88,7 +61,6 @@ export const LogMealModal: React.FC<LogMealModalProps> = ({
   initialMode = 'search',
   onLogMeal,
   onToggleFavorite,
-  onAddFavoriteMeal,
   onRemoveFavorite,
 }) => {
   const [mode, setMode] = useState<LogMealMode>(initialMode);
@@ -100,14 +72,6 @@ export const LogMealModal: React.FC<LogMealModalProps> = ({
   const [time, setTime] = useState(DEFAULT_MEAL_TIMES[initialMealType]);
   const [servings, setServings] = useState(1);
 
-  // AI Quick Log state
-  const [aiInput, setAiInput] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
-  const [aiSummary, setAiSummary] = useState<string | null>(null);
-  const [aiDraftItems, setAiDraftItems] = useState<AiParsedDraftItem[]>([]);
-  const [aiSavedCombo, setAiSavedCombo] = useState(false);
-
   useEffect(() => {
     if (isOpen) {
       setMode(initialFood ? 'search' : initialMode);
@@ -116,8 +80,6 @@ export const LogMealModal: React.FC<LogMealModalProps> = ({
       setTime(DEFAULT_MEAL_TIMES[initialMealType]);
       setServings(1);
       setFavQuery('');
-      setAiError(null);
-      setAiSavedCombo(false);
       if (!initialFood) {
         setQuery('');
       }
@@ -160,161 +122,11 @@ export const LogMealModal: React.FC<LogMealModalProps> = ({
     );
   }, [favorites, favQuery]);
 
-  const aiTotals = useMemo(() => {
-    let calories = 0;
-    let protein = 0;
-    let carbs = 0;
-    let fiber = 0;
-    let sugar = 0;
-    let fat = 0;
-    let netCarbs = 0;
-    let glycemicLoad = 0;
-
-    for (const draft of aiDraftItems) {
-      const s = Math.max(0.1, draft.servings);
-      calories += draft.food.calories * s;
-      protein += draft.food.protein * s;
-      carbs += draft.food.carbs * s;
-      fiber += draft.food.fiber * s;
-      sugar += draft.food.sugar * s;
-      fat += draft.food.fat * s;
-      netCarbs += computeFoodNetCarbs(draft.food) * s;
-      glycemicLoad += computeFoodGlycemicLoad(draft.food, s);
-    }
-
-    return {
-      calories: Math.round(calories),
-      protein: Math.round(protein * 10) / 10,
-      carbs: Math.round(carbs * 10) / 10,
-      fiber: Math.round(fiber * 10) / 10,
-      sugar: Math.round(sugar * 10) / 10,
-      fat: Math.round(fat * 10) / 10,
-      netCarbs: Math.round(netCarbs * 10) / 10,
-      glycemicLoad: Math.round(glycemicLoad * 10) / 10,
-    };
-  }, [aiDraftItems]);
-
   if (!isOpen) return null;
 
   const handleSelectMealType = (next: MealType) => {
     setMealType(next);
     setTime(DEFAULT_MEAL_TIMES[next]);
-  };
-
-  const handleAnalyzeWithAi = async () => {
-    const description = aiInput.trim();
-    if (!description) {
-      setAiError('Describe what you ate first.');
-      return;
-    }
-
-    setAiLoading(true);
-    setAiError(null);
-    setAiSavedCombo(false);
-
-    try {
-      const res = await fetch('/api/ai/quick-log-meal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description, mealType }),
-      });
-      const data = (await res.json()) as {
-        error?: string;
-        mealSummary?: string;
-        items?: FoodItem[];
-      };
-
-      if (!res.ok) {
-        setAiError(data.error || 'Failed to parse meal with AI.');
-        return;
-      }
-
-      const items = Array.isArray(data.items) ? data.items : [];
-      if (items.length === 0) {
-        setAiError('No food items were identified. Try adding more detail.');
-        return;
-      }
-
-      setAiSummary(data.mealSummary || null);
-      setAiDraftItems(items.map((food) => ({ food, servings: 1 })));
-    } catch {
-      setAiError('Network error reaching AI meal parser. Please try again.');
-    } finally {
-      setAiLoading(false);
-    }
-  };
-
-  const handleUpdateAiServings = (index: number, nextServings: number) => {
-    setAiDraftItems((prev) =>
-      prev.map((item, idx) =>
-        idx === index
-          ? { ...item, servings: Math.max(0.1, nextServings) }
-          : item
-      )
-    );
-    setAiSavedCombo(false);
-  };
-
-  const handleRemoveAiItem = (index: number) => {
-    setAiDraftItems((prev) => prev.filter((_, idx) => idx !== index));
-    setAiSavedCombo(false);
-  };
-
-  const handleSaveAiComboAsFavorite = () => {
-    if (aiDraftItems.length === 0) return;
-
-    if (aiDraftItems.length === 1) {
-      const single = aiDraftItems[0];
-      onAddFavoriteMeal(single.food, {
-        name: single.food.name,
-        defaultServings: single.servings,
-        defaultMealType: mealType,
-      });
-      setAiSavedCombo(true);
-      return;
-    }
-
-    const totalGrams = aiDraftItems.reduce(
-      (sum, d) => sum + d.food.servingGrams * d.servings,
-      0
-    );
-    const weightedGiNumerator = aiDraftItems.reduce(
-      (sum, d) => sum + d.food.gi * computeFoodNetCarbs(d.food) * d.servings,
-      0
-    );
-    const weightedGi =
-      aiTotals.netCarbs > 0
-        ? Math.min(100, Math.round(weightedGiNumerator / aiTotals.netCarbs))
-        : 0;
-
-    const cleanTitle =
-      aiInput.trim().length > 0 && aiInput.trim().length <= 56
-        ? aiInput.trim()
-        : aiDraftItems.map((d) => d.food.name).join(' + ').slice(0, 64);
-
-    const combinedFood: FoodItem = {
-      id: `ai-fav-${Date.now()}`,
-      name: cleanTitle,
-      category: 'Prepared Meals',
-      servingLabel: `${aiDraftItems.length} items (${Math.round(totalGrams)}g)`,
-      servingGrams: Math.max(1, Math.round(totalGrams)),
-      calories: aiTotals.calories,
-      protein: aiTotals.protein,
-      carbs: aiTotals.carbs,
-      fiber: aiTotals.fiber,
-      sugar: aiTotals.sugar,
-      fat: aiTotals.fat,
-      gi: weightedGi,
-      tags: ['favorite-meal', 'ai-logged'],
-      isCustom: true,
-    };
-
-    onAddFavoriteMeal(combinedFood, {
-      name: cleanTitle,
-      defaultServings: 1,
-      defaultMealType: mealType,
-    });
-    setAiSavedCombo(true);
   };
 
   const handleQuickAddFavorite = (fav: FavoriteMeal) => {
@@ -329,24 +141,6 @@ export const LogMealModal: React.FC<LogMealModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (mode === 'ai') {
-      if (aiDraftItems.length === 0) return;
-      for (const draft of aiDraftItems) {
-        onLogMeal(draft.food, {
-          date: selectedDate,
-          time,
-          mealType,
-          servings: Math.max(0.1, draft.servings),
-        });
-      }
-      setAiInput('');
-      setAiDraftItems([]);
-      setAiSummary(null);
-      onClose();
-      return;
-    }
-
     if (!selectedFood) return;
     onLogMeal(selectedFood, {
       date: selectedDate,
@@ -448,8 +242,8 @@ export const LogMealModal: React.FC<LogMealModalProps> = ({
             </div>
           </div>
 
-          {/* Entry Mode Switcher: Search Database | AI Quick Log | Favorites */}
-          <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-md">
+          {/* Entry Mode Switcher: Search Database | Favorites */}
+          <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-md">
             <button
               type="button"
               onClick={() => setMode('search')}
@@ -461,18 +255,6 @@ export const LogMealModal: React.FC<LogMealModalProps> = ({
             >
               <Search className="w-3.5 h-3.5" />
               Search Database
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('ai')}
-              className={`inline-flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-medium rounded transition-colors whitespace-nowrap ${
-                mode === 'ai'
-                  ? 'bg-white text-teal-800 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              AI Quick Log
             </button>
             <button
               type="button"
@@ -534,7 +316,7 @@ export const LogMealModal: React.FC<LogMealModalProps> = ({
                 <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-md divide-y divide-slate-100">
                   {filteredFoods.length === 0 ? (
                     <div className="py-6 text-center text-xs text-slate-500">
-                      No matching foods found. Try AI Quick Log or add a custom food.
+                      No matching foods found. Try a different search or add a custom food in the Food Database.
                     </div>
                   ) : (
                     filteredFoods.map((food) => {
@@ -701,219 +483,7 @@ export const LogMealModal: React.FC<LogMealModalProps> = ({
             </>
           )}
 
-          {/* MODE 2: AI QUICK LOG */}
-          {mode === 'ai' && (
-            <div className="space-y-4">
-              <div>
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <label
-                    htmlFor="ai-meal-description"
-                    className="text-xs font-medium text-slate-700"
-                  >
-                    Describe your meal in plain English
-                  </label>
-                  <span className="text-[11px] text-slate-400">
-                    Estimates macros, fiber &amp; glycemic load
-                  </span>
-                </div>
-                <textarea
-                  id="ai-meal-description"
-                  rows={3}
-                  maxLength={500}
-                  value={aiInput}
-                  onChange={(e) => {
-                    setAiInput(e.target.value);
-                    if (aiError) setAiError(null);
-                  }}
-                  placeholder="e.g. 2 scrambled eggs with 1 slice sourdough toast, half an avocado, and black coffee"
-                  className="w-full p-3 text-sm border border-slate-200 rounded-md focus:outline-none focus:border-teal-700 resize-none"
-                />
-
-                <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  <span className="text-[11px] text-slate-400 mr-1">Examples:</span>
-                  {AI_EXAMPLE_PROMPTS.map((sample) => (
-                    <button
-                      key={sample}
-                      type="button"
-                      onClick={() => {
-                        setAiInput(sample);
-                        setAiError(null);
-                      }}
-                      className="text-[11px] text-slate-600 border border-slate-200 rounded px-2 py-0.5 hover:bg-slate-50 hover:text-slate-900 transition-colors truncate max-w-[210px]"
-                      title={sample}
-                    >
-                      {sample}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="mt-3 flex items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={handleAnalyzeWithAi}
-                    disabled={aiLoading || !aiInput.trim()}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium text-white bg-teal-700 rounded-md hover:bg-teal-800 disabled:opacity-45 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {aiLoading ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Sparkles className="w-3.5 h-3.5" />
-                    )}
-                    {aiLoading ? 'Analyzing Meal...' : 'Analyze Meal with AI'}
-                  </button>
-                  {aiDraftItems.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAiDraftItems([]);
-                        setAiSummary(null);
-                        setAiSavedCombo(false);
-                      }}
-                      className="text-xs text-slate-500 hover:text-slate-800"
-                    >
-                      Clear Results
-                    </button>
-                  )}
-                </div>
-
-                {aiError && (
-                  <div className="mt-3 p-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded-md">
-                    {aiError}
-                  </div>
-                )}
-              </div>
-
-              {aiDraftItems.length > 0 && (
-                <div className="border border-slate-200 rounded-md overflow-hidden">
-                  <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="text-xs font-semibold text-slate-900">
-                        Parsed Meal Breakdown ({aiDraftItems.length}{' '}
-                        {aiDraftItems.length === 1 ? 'item' : 'items'})
-                      </div>
-                      {aiSummary && (
-                        <div className="text-[11px] text-slate-500 mt-0.5">
-                          {aiSummary}
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleSaveAiComboAsFavorite}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded border transition-colors whitespace-nowrap ${
-                        aiSavedCombo
-                          ? 'bg-amber-50 text-amber-800 border-amber-200'
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                      }`}
-                    >
-                      {aiSavedCombo ? (
-                        <>
-                          <Check className="w-3.5 h-3.5 text-amber-600" />
-                          Saved to Favorites
-                        </>
-                      ) : (
-                        <>
-                          <Star className="w-3.5 h-3.5 text-amber-500" />
-                          Save Meal to Favorites
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  <div className="divide-y divide-slate-100 max-h-52 overflow-y-auto">
-                    {aiDraftItems.map((draft, index) => {
-                      const s = draft.servings;
-                      const cals = Math.round(draft.food.calories * s);
-                      const net =
-                        Math.round(computeFoodNetCarbs(draft.food) * s * 10) / 10;
-                      const prot = Math.round(draft.food.protein * s * 10) / 10;
-                      const gl = computeFoodGlycemicLoad(draft.food, s);
-                      const isFav = isFoodFavorited(draft.food);
-
-                      return (
-                        <div
-                          key={draft.food.id}
-                          className="px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <div className="font-medium text-slate-900 truncate">
-                              {draft.food.name}
-                            </div>
-                            <div className="text-[11px] text-slate-500 font-mono tabular-nums">
-                              {draft.food.servingLabel} · {cals} kcal · {net}g net ·{' '}
-                              {prot}g prot · GI {draft.food.gi} · GL {gl}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <input
-                              type="number"
-                              step="0.25"
-                              min="0.25"
-                              max="10"
-                              value={draft.servings}
-                              onChange={(e) =>
-                                handleUpdateAiServings(
-                                  index,
-                                  Number(e.target.value) || 1
-                                )
-                              }
-                              aria-label={`Servings for ${draft.food.name}`}
-                              className="w-14 h-7 px-1.5 text-xs font-mono tabular-nums border border-slate-200 rounded bg-white text-right focus:outline-none focus:border-teal-700"
-                            />
-                            <span className="text-[11px] text-slate-400">x</span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                onToggleFavorite(draft.food, {
-                                  defaultServings: draft.servings,
-                                  defaultMealType: mealType,
-                                })
-                              }
-                              className={`p-1 rounded transition-colors ${
-                                isFav
-                                  ? 'text-amber-500'
-                                  : 'text-slate-300 hover:text-amber-500'
-                              }`}
-                              aria-label={`Favorite ${draft.food.name}`}
-                              title="Save item to Favorites"
-                            >
-                              <Star
-                                className={`w-3.5 h-3.5 ${
-                                  isFav ? 'fill-amber-400' : ''
-                                }`}
-                              />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveAiItem(index)}
-                              className="p-1 text-slate-400 hover:text-red-600 transition-colors"
-                              aria-label={`Remove ${draft.food.name}`}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <div className="px-3.5 py-2.5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs font-mono tabular-nums">
-                    <span className="font-sans font-medium text-slate-700">
-                      Combined Totals
-                    </span>
-                    <span className="text-slate-900 font-semibold">
-                      {aiTotals.calories} kcal · {aiTotals.netCarbs}g net ·{' '}
-                      {aiTotals.protein}g prot · {aiTotals.fat}g fat · GL{' '}
-                      {aiTotals.glycemicLoad}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* MODE 3: FAVORITES QUICK ADD */}
+          {/* MODE 2: FAVORITES QUICK ADD */}
           {mode === 'favorites' && (
             <div className="space-y-3">
               {favorites.length > 4 && (
@@ -935,7 +505,7 @@ export const LogMealModal: React.FC<LogMealModalProps> = ({
                     No favorite meals saved yet
                   </p>
                   <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                    Click the star icon on any food in the database, logged meal row, or AI Quick Log result to save it for one-click logging.
+                    Click the star icon on any food in the database or any logged meal row to save it for one-click logging.
                   </p>
                 </div>
               ) : filteredFavorites.length === 0 ? (
@@ -1023,16 +593,7 @@ export const LogMealModal: React.FC<LogMealModalProps> = ({
               Cancel
             </button>
 
-            {mode === 'ai' ? (
-              <button
-                type="submit"
-                disabled={aiDraftItems.length === 0}
-                className="px-4 py-2 text-xs font-medium text-white bg-teal-700 rounded-md hover:bg-teal-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Log {aiDraftItems.length}{' '}
-                {aiDraftItems.length === 1 ? 'Item' : 'Items'} to {mealType}
-              </button>
-            ) : mode === 'search' ? (
+            {mode === 'search' && (
               <button
                 type="submit"
                 disabled={!selectedFood}
@@ -1040,7 +601,7 @@ export const LogMealModal: React.FC<LogMealModalProps> = ({
               >
                 Add to {mealType}
               </button>
-            ) : null}
+            )}
           </div>
         </form>
       </div>

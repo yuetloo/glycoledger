@@ -54,7 +54,6 @@ export default function App() {
     deleteGlucoseReading,
     addWaterEntry,
     deleteWaterEntry,
-    addFavoriteMeal,
     toggleFavoriteFood,
     removeFavoriteMeal,
     addCustomFood,
@@ -483,7 +482,6 @@ export default function App() {
         initialMode={logMealInitialMode}
         onLogMeal={addMealEntry}
         onToggleFavorite={toggleFavoriteFood}
-        onAddFavoriteMeal={addFavoriteMeal}
         onRemoveFavorite={removeFavoriteMeal}
       />
 

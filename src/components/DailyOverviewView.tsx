@@ -6,7 +6,6 @@ import {
   Lightbulb,
   Minus,
   Plus,
-  Sparkles,
   Star,
   Trash2,
 } from 'lucide-react';
@@ -397,14 +396,6 @@ export const DailyOverviewView: React.FC<DailyOverviewViewProps> = ({
               )}
               <button
                 type="button"
-                onClick={() => onOpenLogMeal('Dinner', 'ai')}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-teal-800 bg-teal-50/70 border border-teal-200 rounded-md hover:bg-teal-100/70 transition-colors whitespace-nowrap"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                AI Quick Log
-              </button>
-              <button
-                type="button"
                 onClick={() => onOpenLogMeal('Dinner', 'search')}
                 className="px-3.5 py-1.5 text-xs font-medium text-white bg-teal-700 rounded-md hover:bg-teal-800 transition-colors whitespace-nowrap"
               >
@@ -455,24 +446,26 @@ export const DailyOverviewView: React.FC<DailyOverviewViewProps> = ({
                 No meals recorded for {formatReadableDate(selectedDate)}
               </h3>
               <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                Record your Breakfast, Lunch, Dinner, or Snacks with AI Quick Log, Favorites, or the searchable food database.
+                Record your Breakfast, Lunch, Dinner, or Snacks using your saved Favorites or the searchable food database.
               </p>
               <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
                 <button
                   type="button"
-                  onClick={() => onOpenLogMeal('Breakfast', 'ai')}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-white bg-teal-700 rounded-md hover:bg-teal-800 transition-colors"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  Try AI Quick Log
-                </button>
-                <button
-                  type="button"
                   onClick={() => onOpenLogMeal('Breakfast', 'search')}
-                  className="px-4 py-2 text-xs font-medium text-slate-700 border border-slate-200 rounded-md hover:bg-slate-50 transition-colors"
+                  className="px-4 py-2 text-xs font-medium text-white bg-teal-700 rounded-md hover:bg-teal-800 transition-colors"
                 >
                   Browse Food Database
                 </button>
+                {favorites.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenLogMeal('Breakfast', 'favorites')}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-slate-700 border border-slate-200 rounded-md hover:bg-slate-50 transition-colors"
+                  >
+                    <Star className="w-3.5 h-3.5 text-amber-500" />
+                    Quick Add Favorites
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => onNavigate('planner')}
